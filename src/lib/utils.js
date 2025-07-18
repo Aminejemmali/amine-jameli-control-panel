@@ -1,12 +1,12 @@
-import { clsx, type ClassValue } from "clsx"
+import { clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 
-export function cn(...inputs: ClassValue[]) {
+export function cn(...inputs) {
   return twMerge(clsx(inputs))
 }
 
 // Currency formatting utility
-export const formatCurrency = (amount: number): string => {
+export const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -16,7 +16,7 @@ export const formatCurrency = (amount: number): string => {
 };
 
 // Date formatting utility
-export const formatDate = (date: any): string => {
+export const formatDate = (date) => {
   if (!date) return '';
   
   const dateObj = date.toDate ? date.toDate() : new Date(date);

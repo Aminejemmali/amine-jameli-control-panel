@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { DataTable } from "@/components/DataTable";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, DollarSign } from "lucide-react";
+import { useFirestoreCollection } from "@/hooks/useFirestore";
+import { COLLECTIONS } from "@/lib/firebaseConfig";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
 interface Order {
   id: string;
@@ -25,62 +28,28 @@ interface Order {
   status: 'active' | 'expired' | 'cancelled';
 }
 
-// Mock data
-const mockOrders: Order[] = [
-  {
-    id: '1',
-    clientId: 'u1',
-    clientName: 'John Doe',
-    serviceId: 's1',
-    serviceName: 'Netflix Premium',
-    startDate: '2024-07-01',
-    endDate: '2024-08-01',
-    price: 15.99,
-    cost: 12.00,
-    paymentMethodId: 'pm1',
-    paymentMethod: 'Visa',
-    status: 'active'
-  },
-  {
-    id: '2',
-    clientId: 'u2',
-    clientName: 'Jane Smith',
-    serviceId: 's2',
-    serviceName: 'ChatGPT Plus',
-    startDate: '2024-06-15',
-    endDate: '2024-07-15',
-    price: 20.00,
-    cost: 15.00,
-    paymentMethodId: 'pm2',
-    paymentMethod: 'PayPal',
-    status: 'expired'
-  }
-];
-
-const mockServices = [
-  { id: 's1', name: 'Netflix Premium', hasExpiration: true },
-  { id: 's2', name: 'ChatGPT Plus', hasExpiration: true },
-  { id: 's3', name: 'Canva Pro', hasExpiration: true }
-];
-
-const mockUsers = [
-  { id: 'u1', name: 'John Doe' },
-  { id: 'u2', name: 'Jane Smith' },
-  { id: 'u3', name: 'Mike Johnson' }
-];
-
-const mockPaymentMethods = [
-  { id: 'pm1', type: 'Visa' },
-  { id: 'pm2', type: 'PayPal' },
-  { id: 'pm3', type: 'Bank Transfer' }
-];
 
 export default function Orders() {
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const { data: orders, loading: ordersLoading, addDocument: addOrder, updateDocument: updateOrder, deleteDocument: deleteOrder } = useFirestoreCollection(COLLECTIONS.ORDERS);
+  const { data: services, loading: servicesLoading } = useFirestoreCollection(COLLECTIONS.SERVICES);
+  const { data: users, loading: usersLoading } = useFirestoreCollection(COLLECTIONS.USERS);
+  const { data: paymentMethods, loading: paymentMethodsLoading } = useFirestoreCollection(COLLECTIONS.PAYMENT_METHODS);
+  
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState<typeof mockServices[0] | null>(null);
+  const [selectedService, setSelectedService] = useState<any>(null);
   const { toast } = useToast();
+
+  // Loading state
+  if (ordersLoading || servicesLoading || usersLoading || paymentMethodsLoading) {
+    return (
+      <Layout title="Orders" subtitle="Manage service orders">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-muted-foreground">Loading...</div>
+        </div>
+      </Layout>
+    );
+  }
 
   const columns = [
     { key: 'clientName', label: 'Client' },
@@ -113,7 +82,7 @@ export default function Orders() {
       render: (price: number) => (
         <div className="flex items-center space-x-1">
           <DollarSign size={16} className="text-success" />
-          <span className="font-medium">${price.toFixed(2)}</span>
+          <span className="font-medium">{formatCurrency(price)}</span>
         </div>
       )
     },
@@ -121,7 +90,7 @@ export default function Orders() {
       key: 'cost',
       label: 'Cost',
       render: (cost: number) => (
-        <span className="text-muted-foreground">${cost.toFixed(2)}</span>
+        <span className="text-muted-foreground">{formatCurrency(cost)}</span>
       )
     },
     {
@@ -131,7 +100,7 @@ export default function Orders() {
         const profit = order.price - order.cost;
         return (
           <span className={`font-medium ${profit > 0 ? 'text-success' : 'text-destructive'}`}>
-            ${profit.toFixed(2)}
+            {formatCurrency(profit)}
           </span>
         );
       }
@@ -161,30 +130,37 @@ export default function Orders() {
 
   const handleEdit = (order: Order) => {
     setEditingOrder(order);
-    const service = mockServices.find(s => s.id === order.serviceId);
+    const service = services.find(s => s.id === order.serviceId);
     setSelectedService(service || null);
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (order: Order) => {
+  const handleDelete = async (order: Order) => {
     if (confirm(`Are you sure you want to delete this order?`)) {
-      setOrders(orders.filter(o => o.id !== order.id));
-      toast({
-        title: "Order deleted",
-        description: "The order has been removed.",
-      });
+      try {
+        await deleteOrder(order.id);
+        toast({
+          title: "Order deleted",
+          description: "The order has been removed.",
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete order.",
+          variant: "destructive"
+        });
+      }
     }
   };
 
-  const handleSave = (formData: FormData) => {
-    const client = mockUsers.find(u => u.id === formData.get('clientId'));
-    const service = mockServices.find(s => s.id === formData.get('serviceId'));
-    const paymentMethod = mockPaymentMethods.find(pm => pm.id === formData.get('paymentMethodId'));
+  const handleSave = async (formData: FormData) => {
+    const client = users.find(u => u.id === formData.get('clientId'));
+    const service = services.find(s => s.id === formData.get('serviceId'));
+    const paymentMethod = paymentMethods.find(pm => pm.id === formData.get('paymentMethodId'));
 
     const orderData = {
-      id: editingOrder?.id || Date.now().toString(),
       clientId: formData.get('clientId') as string,
-      clientName: client?.name || '',
+      clientName: client?.clientName || '',
       serviceId: formData.get('serviceId') as string,
       serviceName: service?.name || '',
       startDate: formData.get('startDate') as string,
@@ -196,17 +172,25 @@ export default function Orders() {
       status: 'active' as const
     };
 
-    if (editingOrder) {
-      setOrders(orders.map(o => o.id === editingOrder.id ? orderData : o));
+    try {
+      if (editingOrder) {
+        await updateOrder(editingOrder.id, orderData);
+        toast({
+          title: "Order updated",
+          description: "The order has been updated.",
+        });
+      } else {
+        await addOrder(orderData);
+        toast({
+          title: "Order created",
+          description: "A new order has been created.",
+        });
+      }
+    } catch (error) {
       toast({
-        title: "Order updated",
-        description: "The order has been updated.",
-      });
-    } else {
-      setOrders([...orders, orderData]);
-      toast({
-        title: "Order created",
-        description: "A new order has been created.",
+        title: "Error",
+        description: "Failed to save order.",
+        variant: "destructive"
       });
     }
 
@@ -249,9 +233,9 @@ export default function Orders() {
                     <SelectValue placeholder="Select client" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockUsers.map(user => (
+                    {users.map(user => (
                       <SelectItem key={user.id} value={user.id}>
-                        {user.name}
+                        {user.clientName}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -264,7 +248,7 @@ export default function Orders() {
                   name="serviceId" 
                   defaultValue={editingOrder?.serviceId || ''}
                   onValueChange={(value) => {
-                    const service = mockServices.find(s => s.id === value);
+                    const service = services.find(s => s.id === value);
                     setSelectedService(service || null);
                   }}
                 >
@@ -272,7 +256,7 @@ export default function Orders() {
                     <SelectValue placeholder="Select service" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockServices.map(service => (
+                    {services.map(service => (
                       <SelectItem key={service.id} value={service.id}>
                         {service.name}
                       </SelectItem>
@@ -342,7 +326,7 @@ export default function Orders() {
                   <SelectValue placeholder="Select payment method" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockPaymentMethods.map(method => (
+                  {paymentMethods.map(method => (
                     <SelectItem key={method.id} value={method.id}>
                       {method.type}
                     </SelectItem>

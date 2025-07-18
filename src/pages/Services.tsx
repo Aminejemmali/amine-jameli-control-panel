@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { DataTable } from "@/components/DataTable";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useFirestoreCollection } from "@/hooks/useFirestore";
+import { COLLECTIONS } from "@/lib/firebaseConfig";
 
 interface Service {
   id: string;
@@ -19,43 +21,22 @@ interface Service {
   status: 'active' | 'inactive' | 'paused';
 }
 
-// Mock data
-const mockServices: Service[] = [
-  {
-    id: '1',
-    name: 'Netflix Premium',
-    image: 'https://cdn.worldvectorlogo.com/logos/netflix-2.svg',
-    hasExpiration: true,
-    status: 'active'
-  },
-  {
-    id: '2',
-    name: 'ChatGPT Plus',
-    image: 'https://cdn.worldvectorlogo.com/logos/openai-2.svg',
-    hasExpiration: true,
-    status: 'active'
-  },
-  {
-    id: '3',
-    name: 'Canva Pro',
-    image: 'https://cdn.worldvectorlogo.com/logos/canva-1.svg',
-    hasExpiration: true,
-    status: 'paused'
-  },
-  {
-    id: '4',
-    name: 'Spotify Premium',
-    image: 'https://cdn.worldvectorlogo.com/logos/spotify-2.svg',
-    hasExpiration: true,
-    status: 'active'
-  }
-];
 
 export default function Services() {
-  const [services, setServices] = useState<Service[]>(mockServices);
+  const { data: services, loading, addDocument: addService, updateDocument: updateService, deleteDocument: deleteService } = useFirestoreCollection(COLLECTIONS.SERVICES);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
+
+  if (loading) {
+    return (
+      <Layout title="Services" subtitle="Manage digital services">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-muted-foreground">Loading...</div>
+        </div>
+      </Layout>
+    );
+  }
 
   const columns = [
     {
@@ -101,36 +82,51 @@ export default function Services() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (service: Service) => {
+  const handleDelete = async (service: Service) => {
     if (confirm(`Are you sure you want to delete ${service.name}?`)) {
-      setServices(services.filter(s => s.id !== service.id));
-      toast({
-        title: "Service deleted",
-        description: `${service.name} has been removed.`,
-      });
+      try {
+        await deleteService(service.id);
+        toast({
+          title: "Service deleted",
+          description: `${service.name} has been removed.`,
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete service.",
+          variant: "destructive"
+        });
+      }
     }
   };
 
-  const handleSave = (formData: FormData) => {
+  const handleSave = async (formData: FormData) => {
     const serviceData = {
-      id: editingService?.id || Date.now().toString(),
       name: formData.get('name') as string,
       image: formData.get('image') as string,
       hasExpiration: formData.get('hasExpiration') === 'on',
       status: formData.get('status') as 'active' | 'inactive' | 'paused'
     };
 
-    if (editingService) {
-      setServices(services.map(s => s.id === editingService.id ? serviceData : s));
+    try {
+      if (editingService) {
+        await updateService(editingService.id, serviceData);
+        toast({
+          title: "Service updated",
+          description: `${serviceData.name} has been updated.`,
+        });
+      } else {
+        await addService(serviceData);
+        toast({
+          title: "Service created",
+          description: `${serviceData.name} has been added.`,
+        });
+      }
+    } catch (error) {
       toast({
-        title: "Service updated",
-        description: `${serviceData.name} has been updated.`,
-      });
-    } else {
-      setServices([...services, serviceData]);
-      toast({
-        title: "Service created",
-        description: `${serviceData.name} has been added.`,
+        title: "Error",
+        description: "Failed to save service.",
+        variant: "destructive"
       });
     }
 
