@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app';
+import { getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 
 // Firebase Configuration for Amine Jameli Services Admin Panel
@@ -15,7 +16,7 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize Firestore
 export const db = getFirestore(app);
