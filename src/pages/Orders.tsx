@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, DollarSign } from "lucide-react";
+import { DollarSign } from "lucide-react";
+import { Calendar as CalendarIcon } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { 
   subscribeToOrders, 
@@ -20,6 +21,8 @@ import {
 import { getAllServices } from "@/services/servicesService";
 import { getAllUsers } from "@/services/usersService";
 import { getAllPaymentMethods } from "@/services/paymentService";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 interface Order {
   id: string;
@@ -47,6 +50,10 @@ export default function Orders() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<any>(null);
   const { toast } = useToast();
+  const [expirationFilter, setExpirationFilter] = useState('all'); // all | expired | soon | active
+  const [serviceFilter, setServiceFilter] = useState('all'); // all or serviceId
+  const [startDate, setStartDate] = useState<string>(editingOrder?.startDate || '');
+  const [endDate, setEndDate] = useState<string>(editingOrder?.endDate || '');
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -90,6 +97,34 @@ export default function Orders() {
     );
   }
 
+  // Filter orders based on expiration and service
+  const filteredOrders = orders.filter(order => {
+    // Service filter
+    if (serviceFilter !== 'all' && order.serviceId !== serviceFilter) return false;
+    // Expiration filter
+    if (expirationFilter === 'expired') {
+      if (!order.endDate) return false;
+      const end = new Date(order.endDate);
+      const today = new Date(new Date().toDateString());
+      return end <= today;
+    }
+    if (expirationFilter === 'soon') {
+      if (!order.endDate) return false;
+      const end = new Date(order.endDate);
+      const today = new Date(new Date().toDateString());
+      const diffTime = end.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return end > today && diffDays <= 10;
+    }
+    if (expirationFilter === 'active') {
+      if (!order.endDate) return true;
+      const end = new Date(order.endDate);
+      const today = new Date(new Date().toDateString());
+      return end > today && (end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24) > 10;
+    }
+    return true;
+  });
+
   const columns = [
     { key: 'clientName', label: 'Client' },
     { key: 'serviceName', label: 'Service' },
@@ -98,7 +133,7 @@ export default function Orders() {
       label: 'Start Date',
       render: (date: string) => (
         <div className="flex items-center space-x-2">
-          <Calendar size={16} className="text-muted-foreground" />
+          <CalendarIcon size={16} className="text-muted-foreground" />
           <span>{new Date(date).toLocaleDateString()}</span>
         </div>
       )
@@ -106,14 +141,33 @@ export default function Orders() {
     {
       key: 'endDate',
       label: 'End Date',
-      render: (date: string) => date ? (
-        <div className="flex items-center space-x-2">
-          <Calendar size={16} className="text-muted-foreground" />
-          <span>{new Date(date).toLocaleDateString()}</span>
-        </div>
-      ) : (
-        <span className="text-muted-foreground">-</span>
-      )
+      render: (date: string) => {
+        if (!date) {
+          return <span className="text-muted-foreground">-</span>;
+        }
+        const today = new Date(new Date().toDateString());
+        const end = new Date(date);
+        const diffTime = end.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const isPast = end <= today;
+        const isWarning = !isPast && diffDays <= 10;
+        return (
+          <div className="flex items-center space-x-2">
+            <CalendarIcon size={16} className="text-muted-foreground" />
+            <span
+              className={
+                isPast
+                  ? 'bg-gradient-to-r from-red-500 to-red-700 text-white px-2 py-1 rounded'
+                  : isWarning
+                  ? 'bg-gradient-to-r from-yellow-300 to-yellow-500 text-black px-2 py-1 rounded'
+                  : ''
+              }
+            >
+              {end.toLocaleDateString()}
+            </span>
+          </div>
+        );
+      }
     },
     {
       key: 'price',
@@ -233,9 +287,40 @@ export default function Orders() {
 
   return (
     <Layout title="Orders" subtitle="Manage service orders and subscriptions">
+      {/* Filter Controls */}
+      <div className="flex flex-wrap gap-4 mb-4 px-6">
+        <div>
+          <Label htmlFor="expirationFilter">Expiration</Label>
+          <Select value={expirationFilter} onValueChange={setExpirationFilter} name="expirationFilter">
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Expiration" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="expired">Expired</SelectItem>
+              <SelectItem value="soon">Expiring Soon</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="serviceFilter">Service</Label>
+          <Select value={serviceFilter} onValueChange={setServiceFilter} name="serviceFilter">
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Service" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              {services.map(service => (
+                <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
       <DataTable
         title="Order Management"
-        data={orders}
+        data={filteredOrders}
         columns={columns}
         onAdd={handleAdd}
         onEdit={handleEdit}
@@ -301,24 +386,68 @@ export default function Orders() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="startDate">Start Date</Label>
-                <Input
-                  id="startDate"
-                  name="startDate"
-                  type="date"
-                  defaultValue={editingOrder?.startDate || ''}
-                  required
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={"w-full justify-start text-left font-normal" + (startDate ? "" : " text-muted-foreground")}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {startDate
+                        ? new Date(startDate).toLocaleDateString()
+                        : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="p-0">
+                    <Calendar
+                      mode="single"
+                      selected={startDate ? new Date(startDate) : undefined}
+                      onSelect={(date: Date | undefined) => {
+                        if (date instanceof Date && !isNaN(date.getTime())) {
+                          const localDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                          setStartDate(localDate);
+                          const input = document.getElementById('startDate') as HTMLInputElement;
+                          if (input) input.value = localDate;
+                        }
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <input type="hidden" id="startDate" name="startDate" value={startDate} required />
               </div>
-
               {(selectedService?.hasExpiration || editingOrder?.endDate) && (
                 <div className="space-y-2">
                   <Label htmlFor="endDate">End Date</Label>
-                  <Input
-                    id="endDate"
-                    name="endDate"
-                    type="date"
-                    defaultValue={editingOrder?.endDate || ''}
-                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={"w-full justify-start text-left font-normal" + (endDate ? "" : " text-muted-foreground")}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {endDate
+                          ? new Date(endDate).toLocaleDateString()
+                          : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="p-0">
+                      <Calendar
+                        mode="single"
+                        selected={endDate ? new Date(endDate) : undefined}
+                        onSelect={(date: Date | undefined) => {
+                          if (date instanceof Date && !isNaN(date.getTime())) {
+                            const localDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                            setEndDate(localDate);
+                            const input = document.getElementById('endDate') as HTMLInputElement;
+                            if (input) input.value = localDate;
+                          }
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <input type="hidden" id="endDate" name="endDate" value={endDate} />
                 </div>
               )}
             </div>

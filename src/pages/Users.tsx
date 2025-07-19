@@ -19,7 +19,7 @@ import {
 interface User {
   id: string;
   clientName: string;
-  clientEmail: string;
+  clientEmail?: string;
   note?: string;
   joinDate: string;
   totalOrders: number;
@@ -194,14 +194,13 @@ export default function Users() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="clientEmail">Email Address</Label>
+              <Label htmlFor="clientEmail">Email Address (Optional)</Label>
               <Input
                 id="clientEmail"
                 name="clientEmail"
                 type="email"
                 defaultValue={editingUser?.clientEmail || ''}
                 placeholder="john.doe@email.com"
-                required
               />
             </div>
 

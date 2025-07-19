@@ -2,83 +2,85 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Amine Jameli Services Admin Panel Design System */
+/* Amine Jameli Services Admin Panel Design System - Orange/White/Dark/Red Theme */
 
 @layer base {
   :root {
-    /* Professional Admin Panel Theme - Dark Mode Default */
-    --background: 220 13% 9%;
-    --foreground: 220 9% 98%;
-
-    --card: 220 13% 12%;
-    --card-foreground: 220 9% 98%;
-
-    --popover: 220 13% 12%;
-    --popover-foreground: 220 9% 98%;
-
-    --primary: 217 91% 60%;
-    --primary-foreground: 220 13% 9%;
-    --primary-glow: 217 91% 70%;
-
-    --secondary: 220 9% 18%;
-    --secondary-foreground: 220 9% 98%;
-
-    --muted: 220 9% 15%;
-    --muted-foreground: 220 9% 65%;
-
-    --accent: 142 86% 28%;
-    --accent-foreground: 220 9% 98%;
-
+    /* Orange/White Theme */
+    --primary: 24 100% 50%; /* Orange */
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 24 100% 60%;
+    --background: 0 0% 100%;
+    --foreground: 24 100% 20%;
+    --card: 0 0% 100%;
+    --card-foreground: 24 100% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 24 100% 20%;
+    --secondary: 24 30% 95%;
+    --secondary-foreground: 24 100% 30%;
+    --muted: 24 30% 95%;
+    --muted-foreground: 24 10% 40%;
+    --accent: 0 84% 60%; /* Red */
+    --accent-foreground: 0 0% 100%;
     --success: 142 86% 28%;
-    --success-foreground: 220 9% 98%;
-
+    --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
-    --warning-foreground: 220 13% 9%;
-
+    --warning-foreground: 24 100% 20%;
     --destructive: 0 84% 60%;
-    --destructive-foreground: 220 9% 98%;
-
-    --border: 220 9% 20%;
-    --input: 220 9% 18%;
-    --ring: 217 91% 60%;
-
+    --destructive-foreground: 0 0% 100%;
+    --border: 24 30% 90%;
+    --input: 24 30% 95%;
+    --ring: 24 100% 50%;
     --radius: 0.75rem;
-
     /* Admin Panel Specific Colors */
-    --sidebar-bg: 220 13% 11%;
-    --sidebar-border: 220 9% 18%;
-    --header-bg: 220 13% 12%;
-    
+    --sidebar-bg: 24 30% 97%;
+    --sidebar-border: 24 30% 90%;
+    --header-bg: 24 100% 98%;
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 70%));
+    --gradient-primary: linear-gradient(90deg, hsl(24 100% 50%), hsl(14 100% 60%));
     --gradient-success: linear-gradient(135deg, hsl(142 86% 28%), hsl(142 86% 35%));
-    --gradient-card: linear-gradient(135deg, hsl(220 13% 12%), hsl(220 13% 14%));
-    --gradient-sidebar: linear-gradient(180deg, hsl(220 13% 11%), hsl(220 13% 9%));
-    
+    --gradient-card: linear-gradient(135deg, hsl(24 30% 97%), hsl(24 30% 95%));
+    --gradient-sidebar: linear-gradient(180deg, hsl(24 30% 97%), hsl(24 30% 90%));
     /* Shadows */
-    --shadow-elegant: 0 10px 30px -10px hsl(220 13% 5% / 0.3);
-    --shadow-card: 0 4px 20px -4px hsl(220 13% 5% / 0.25);
-    --shadow-primary: 0 0 40px hsl(217 91% 60% / 0.15);
-    
+    --shadow-elegant: 0 10px 30px -10px hsl(24 30% 60% / 0.12);
+    --shadow-card: 0 4px 20px -4px hsl(24 30% 60% / 0.10);
+    --shadow-primary: 0 0 40px hsl(24 100% 50% / 0.15);
     /* Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+  .dark {
+    --background: 24 10% 10%;
+    --foreground: 0 0% 100%;
+    --card: 24 10% 14%;
+    --card-foreground: 0 0% 100%;
+    --popover: 24 10% 14%;
+    --popover-foreground: 0 0% 100%;
+    --secondary: 24 10% 18%;
+    --secondary-foreground: 24 100% 90%;
+    --muted: 24 10% 18%;
+    --muted-foreground: 24 10% 70%;
+    --accent: 0 84% 60%;
+    --accent-foreground: 0 0% 100%;
+    --success: 142 86% 28%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 24 10% 20%;
+    --input: 24 10% 18%;
+    --ring: 24 100% 50%;
+    --sidebar-bg: 24 10% 12%;
+    --sidebar-border: 24 10% 20%;
+    --header-bg: 24 10% 14%;
+    --gradient-primary: linear-gradient(90deg, hsl(24 100% 50%), hsl(14 100% 60%));
+    --gradient-success: linear-gradient(135deg, hsl(142 86% 28%), hsl(142 86% 35%));
+    --gradient-card: linear-gradient(135deg, hsl(24 10% 14%), hsl(24 10% 18%));
+    --gradient-sidebar: linear-gradient(180deg, hsl(24 10% 12%), hsl(24 10% 10%));
+    --shadow-elegant: 0 10px 30px -10px hsl(24 30% 10% / 0.25);
+    --shadow-card: 0 4px 20px -4px hsl(24 30% 10% / 0.18);
+    --shadow-primary: 0 0 40px hsl(24 100% 50% / 0.18);
   }
 }
 
@@ -87,24 +89,39 @@
   .admin-card {
     @apply bg-card border border-border rounded-lg shadow-[var(--shadow-card)] transition-[var(--transition-smooth)];
   }
-  
   .admin-button-primary {
-    @apply bg-[var(--gradient-primary)] text-primary-foreground px-4 py-2 rounded-lg transition-[var(--transition-smooth)] shadow-[var(--shadow-primary)] hover:scale-105;
+    background: linear-gradient(90deg, hsl(24, 100%, 50%), hsl(14, 100%, 60%));
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 2px 8px hsl(24, 100%, 40%, 0.15);
+    border-radius: 0.75rem;
+    padding: 0.5rem 1.25rem;
+    transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
   }
-  
+  .admin-button-primary:hover {
+    filter: brightness(1.1);
+    transform: scale(1.04);
+    box-shadow: 0 4px 16px hsl(24, 100%, 40%, 0.25);
+  }
+  .dark .admin-button-primary {
+    background: linear-gradient(90deg, hsl(24, 100%, 50%), hsl(14, 100%, 60%));
+    color: white;
+    border: 1px solid hsl(24, 100%, 50%);
+    filter: brightness(1.15) contrast(1.1);
+  }
   .admin-button-success {
     @apply bg-[var(--gradient-success)] text-success-foreground px-4 py-2 rounded-lg transition-[var(--transition-smooth)] hover:scale-105;
   }
-  
   .admin-sidebar {
     @apply bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] min-h-screen;
     background: var(--gradient-sidebar);
   }
-  
   .admin-header {
     @apply bg-[var(--header-bg)] border-b border-border px-6 py-4 shadow-[var(--shadow-card)];
   }
-  
   .stats-card {
     @apply admin-card p-6 hover:shadow-[var(--shadow-elegant)] transition-[var(--transition-smooth)];
   }
@@ -114,7 +131,6 @@
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground;
   }

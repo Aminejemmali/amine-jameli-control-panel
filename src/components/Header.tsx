@@ -1,6 +1,9 @@
 import { Search, Bell, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useTheme } from "next-themes";
+import { Switch } from "@/components/ui/switch";
+import { Moon, Sun } from "lucide-react";
 
 interface HeaderProps {
   title: string;
@@ -9,6 +12,7 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle, showSearch = true }: HeaderProps) {
+  const { theme, setTheme } = useTheme();
   return (
     <header className="admin-header">
       <div className="flex items-center justify-between">
@@ -36,6 +40,16 @@ export function Header({ title, subtitle, showSearch = true }: HeaderProps) {
           <Button variant="ghost" size="icon">
             <Settings size={20} />
           </Button>
+          {/* Theme Toggle */}
+          <div className="flex items-center gap-2">
+            <Sun className="w-4 h-4 text-yellow-400" />
+            <Switch
+              checked={theme === 'dark'}
+              onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+              aria-label="Toggle dark mode"
+            />
+            <Moon className="w-4 h-4 text-blue-900 dark:text-blue-300" />
+          </div>
         </div>
       </div>
     </header>

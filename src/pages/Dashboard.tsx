@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Layout } from "@/components/Layout";
 import { StatsCard } from "@/components/StatsCard";
 import { DataTable } from "@/components/DataTable";
@@ -29,6 +29,7 @@ import { subscribeToOrders } from "@/services/ordersService";
 import { subscribeToServices } from "@/services/servicesService";
 import { subscribeToUsers } from "@/services/usersService";
 import { formatCurrency } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export default function Dashboard() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -38,6 +39,7 @@ export default function Dashboard() {
   const [statsData, setStatsData] = useState<any[]>([]);
   const [revenueData, setRevenueData] = useState<any[]>([]);
   const [serviceDistribution, setServiceDistribution] = useState<any[]>([]);
+  const [ordersTimeframe, setOrdersTimeframe] = useState<'day' | 'week' | 'month'>('month');
 
   useEffect(() => {
     let unsubscribeOrders: (() => void) | undefined;
@@ -160,93 +162,177 @@ export default function Dashboard() {
 
     // Calculate total revenue
     const totalRevenue = ordersData.reduce((sum, order) => sum + (order.price || 0), 0);
-    
     // Calculate total profit
     const totalProfit = ordersData.reduce((sum, order) => {
       const profit = (order.price || 0) - (order.cost || 0);
       return sum + profit;
     }, 0);
-    
     // Count active orders
     const activeOrders = ordersData.filter(order => order.status === 'active').length;
-    
     // Count active services
     const activeServices = servicesData.filter(service => service.status === 'active').length;
-    
     // Calculate revenue growth (comparing last 30 days vs previous 30 days)
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-    
     const recentRevenue = ordersData
       .filter(order => new Date(order.startDate) >= thirtyDaysAgo)
       .reduce((sum, order) => sum + (order.price || 0), 0);
-    
     const previousRevenue = ordersData
       .filter(order => {
         const orderDate = new Date(order.startDate);
         return orderDate >= sixtyDaysAgo && orderDate < thirtyDaysAgo;
       })
       .reduce((sum, order) => sum + (order.price || 0), 0);
-    
     const revenueGrowth = previousRevenue > 0 
       ? ((recentRevenue - previousRevenue) / previousRevenue * 100).toFixed(1)
       : '0';
-
     // Calculate user growth
     const recentUsers = usersData.filter(user => {
       if (!user.createdAt) return false;
       const userDate = user.createdAt.toDate ? user.createdAt.toDate() : new Date(user.createdAt);
       return userDate >= thirtyDaysAgo;
     }).length;
-
     const userGrowthRate = usersData.length > 0 
       ? ((recentUsers / usersData.length) * 100).toFixed(1)
       : '0';
-
+    // New users this month
+    const newUsersThisMonth = recentUsers;
+    // Orders completed this month (status === 'expired' or endDate in last 30 days and before today)
+    const completedOrdersThisMonth = ordersData.filter(order => {
+      if (!order.endDate) return false;
+      const end = new Date(order.endDate);
+      return end >= thirtyDaysAgo && end <= now;
+    }).length;
+    // Most profitable service
+    const serviceProfits: { [key: string]: number } = {};
+    ordersData.forEach(order => {
+      if (!order.serviceId) return;
+      const profit = (order.price || 0) - (order.cost || 0);
+      serviceProfits[order.serviceId] = (serviceProfits[order.serviceId] || 0) + profit;
+    });
+    let mostProfitableService = null;
+    let maxProfit = -Infinity;
+    Object.entries(serviceProfits).forEach(([serviceId, profit]) => {
+      if (profit > maxProfit) {
+        maxProfit = profit;
+        mostProfitableService = serviceId;
+      }
+    });
+    const mostProfitableServiceName = servicesData.find(s => s.id === mostProfitableService)?.name || 'N/A';
     setStatsData([
       {
         title: "Total Revenue",
         value: formatCurrency(totalRevenue),
         change: { 
-          value: `${revenueGrowth > 0 ? '+' : ''}${revenueGrowth}%`, 
-          trend: parseFloat(revenueGrowth) >= 0 ? "up" as const : "down" as const 
+          value: `${parseFloat(revenueGrowth) > 0 ? '+' : ''}${revenueGrowth}%`, 
+          trend: parseFloat(revenueGrowth) >= 0 ? "up" : "down" 
         },
         icon: DollarSign,
-        variant: "success" as const
+        variant: "success"
       },
       {
         title: "Total Profit",
         value: formatCurrency(totalProfit),
         change: { 
           value: totalProfit > 0 ? "Profitable" : "Loss", 
-          trend: totalProfit > 0 ? "up" as const : "down" as const 
+          trend: totalProfit > 0 ? "up" : "down" 
         },
         icon: TrendingUp,
-        variant: totalProfit > 0 ? "success" as const : "destructive" as const
+        variant: totalProfit > 0 ? "success" : "destructive"
       },
       {
         title: "Active Orders",
         value: activeOrders.toString(),
         change: { 
           value: `${ordersData.length} total`, 
-          trend: "neutral" as const 
+          trend: "neutral" 
         },
         icon: ShoppingCart,
-        variant: "default" as const
+        variant: "default"
       },
       {
         title: "Total Users",
         value: usersData.length.toString(),
         change: { 
           value: `+${userGrowthRate}% this month`, 
-          trend: parseFloat(userGrowthRate) > 0 ? "up" as const : "neutral" as const 
+          trend: parseFloat(userGrowthRate) > 0 ? "up" : "neutral" 
         },
         icon: Users,
-        variant: "default" as const
+        variant: "default"
+      },
+      {
+        title: "New Users This Month",
+        value: newUsersThisMonth.toString(),
+        change: { value: '', trend: "up" },
+        icon: Users,
+        variant: "success"
+      },
+      {
+        title: "Orders Completed This Month",
+        value: completedOrdersThisMonth.toString(),
+        change: { value: '', trend: "up" },
+        icon: Package,
+        variant: "success"
+      },
+      {
+        title: "Most Profitable Service",
+        value: mostProfitableServiceName,
+        change: { value: '', trend: "up" },
+        icon: DollarSign,
+        variant: "success"
       }
     ]);
   };
+
+  // Compute per-service profit and % return
+  const serviceProfitTable = services.map(service => {
+    const serviceOrders = orders.filter(order => order.serviceId === service.id);
+    const totalRevenue = serviceOrders.reduce((sum, o) => sum + (o.price || 0), 0);
+    const totalCost = serviceOrders.reduce((sum, o) => sum + (o.cost || 0), 0);
+    const totalProfit = totalRevenue - totalCost;
+    const percentReturn = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
+    return {
+      name: service.name,
+      totalRevenue,
+      totalCost,
+      totalProfit,
+      percentReturn,
+    };
+  }).filter(row => row.totalRevenue > 0 || row.totalCost > 0);
+
+  // Orders over time chart data
+  const ordersOverTimeData = useMemo(() => {
+    if (!orders.length) return [];
+    const dataMap: Record<string, { label: string; count: number }> = {};
+    orders.forEach(order => {
+      const date = new Date(order.startDate);
+      let key = '';
+      let label = '';
+      if (ordersTimeframe === 'day') {
+        key = date.toISOString().slice(0, 10);
+        label = date.toLocaleDateString();
+      } else if (ordersTimeframe === 'week') {
+        // Get ISO week number
+        const temp = new Date(date.getTime());
+        temp.setHours(0,0,0,0);
+        temp.setDate(temp.getDate() - temp.getDay() + 1); // Monday as first day
+        const week = Math.ceil((((date as any) - (new Date(date.getFullYear(),0,1) as any)) / 86400000 + new Date(date.getFullYear(),0,1).getDay()+1)/7);
+        key = `${date.getFullYear()}-W${week}`;
+        label = `W${week} ${date.getFullYear()}`;
+      } else {
+        key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        label = date.toLocaleString('default', { month: 'short', year: 'numeric' });
+      }
+      if (!dataMap[key]) dataMap[key] = { label, count: 0 };
+      dataMap[key].count++;
+    });
+    // Sort keys chronologically
+    const sorted = Object.entries(dataMap).sort(([a], [b]) => a.localeCompare(b));
+    // Limit to last 30 days, 12 weeks, or 12 months
+    const limit = ordersTimeframe === 'day' ? 30 : 12;
+    return sorted.slice(-limit).map(([_, v]) => v);
+  }, [orders, ordersTimeframe]);
 
   if (loading) {
     return (
@@ -295,9 +381,89 @@ export default function Dashboard() {
     { key: 'startDate', label: 'Date' }
   ];
 
+  // Expiring soon or expired orders (within 10 days or past)
+  const expiringOrders = orders.filter(order => {
+    if (!order.endDate) return false;
+    const today = new Date(new Date().toDateString());
+    const end = new Date(order.endDate);
+    if (isNaN(end.getTime())) return false; // skip invalid dates
+    const diffTime = end.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return end <= today || (end > today && diffDays <= 10);
+  }).sort((a, b) => {
+    const aEnd = new Date(a.endDate);
+    const bEnd = new Date(b.endDate);
+    return aEnd.getTime() - bEnd.getTime();
+  }).slice(0, 5);
+  const expiringOrdersCount = expiringOrders.length;
+  const expiredOrdersCount = expiringOrders.filter(order => {
+    const end = new Date(order.endDate);
+    const today = new Date(new Date().toDateString());
+    return end <= today;
+  }).length;
+
+  const expiringColumns = [
+    { key: 'clientName', label: 'Client' },
+    { key: 'serviceName', label: 'Service' },
+    {
+      key: 'endDate',
+      label: 'End Date',
+      render: (date: string) => (
+        <span className="font-medium">
+          {date ? new Date(date).toLocaleDateString() : '-'}
+        </span>
+      )
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (status: string) => {
+        const statusStr = String(status);
+        return (
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+            statusStr === 'active' ? 'bg-success/20 text-success' : 
+            statusStr === 'expired' ? 'bg-warning/20 text-warning' :
+            'bg-destructive/20 text-destructive'
+          }`}>
+            {statusStr.charAt(0).toUpperCase() + statusStr.slice(1)}
+          </span>
+        );
+      }
+    }
+  ];
+
   return (
     <Layout title="Dashboard" subtitle="Welcome back to Amine Jameli Services Admin Panel">
       <div className="space-y-6">
+        {/* Quick Actions */}
+        <div className="flex flex-wrap gap-4 items-center justify-between px-2 pt-2">
+          <div className="flex gap-2">
+            <button className="admin-button-primary flex items-center gap-1" onClick={() => window.location.href = '/orders'}>
+              <ShoppingCart size={16} /> Add Order
+            </button>
+            <button className="admin-button-primary flex items-center gap-1" onClick={() => window.location.href = '/services'}>
+              <Package size={16} /> Add Service
+            </button>
+            <button className="admin-button-primary flex items-center gap-1" onClick={() => window.location.href = '/users'}>
+              <Users size={16} /> Add User
+            </button>
+          </div>
+        </div>
+        {/* Notifications/Alerts */}
+        {expiringOrdersCount > 0 && (
+          <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded flex items-center gap-2">
+            <Calendar size={20} className="text-yellow-600" />
+            <span>
+              {expiredOrdersCount > 0 && (
+                <b>{expiredOrdersCount} order{expiredOrdersCount > 1 ? 's are' : ' is'} expired.</b>
+              )}
+              {expiredOrdersCount > 0 && expiringOrdersCount > expiredOrdersCount && ' '}
+              {expiringOrdersCount > expiredOrdersCount && (
+                <b>{expiringOrdersCount - expiredOrdersCount} order{expiringOrdersCount - expiredOrdersCount > 1 ? 's are' : ' is'} expiring soon.</b>
+              )}
+            </span>
+          </div>
+        )}
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {statsData.map((stat, index) => (
@@ -305,8 +471,91 @@ export default function Dashboard() {
           ))}
         </div>
 
+        {/* Per-Service Profit Table */}
+        <div className="admin-card p-6">
+          <h3 className="text-lg font-semibold text-foreground mb-4">Service Profitability</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="px-4 py-2 text-left">Service</th>
+                  <th className="px-4 py-2 text-right">Revenue</th>
+                  <th className="px-4 py-2 text-right">Cost</th>
+                  <th className="px-4 py-2 text-right">Profit</th>
+                  <th className="px-4 py-2 text-right">% Return</th>
+                </tr>
+              </thead>
+              <tbody>
+                {serviceProfitTable.map(row => (
+                  <tr key={row.name}>
+                    <td className="px-4 py-2 font-medium">{row.name}</td>
+                    <td className="px-4 py-2 text-right">{formatCurrency(row.totalRevenue)}</td>
+                    <td className="px-4 py-2 text-right">{formatCurrency(row.totalCost)}</td>
+                    <td className={"px-4 py-2 text-right " + (row.totalProfit >= 0 ? "text-success" : "text-destructive")}>{formatCurrency(row.totalProfit)}</td>
+                    <td className={"px-4 py-2 text-right " + (row.percentReturn >= 0 ? "text-success" : "text-destructive")}>{row.totalCost > 0 ? row.percentReturn.toFixed(1) + '%' : '-'}</td>
+                  </tr>
+                ))}
+                {serviceProfitTable.length === 0 && (
+                  <tr><td colSpan={5} className="text-center text-muted-foreground py-4">No service data available</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Expiring Soon/Expired Orders Widget */}
+        <div className="admin-card p-6">
+          <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            <Calendar size={20} /> Expiring Soon / Expired Orders
+          </h3>
+          {expiringOrders.length > 0 ? (
+            <DataTable
+              title="Expiring Soon / Expired Orders"
+              data={expiringOrders}
+              columns={expiringColumns}
+              searchPlaceholder="Search expiring orders..."
+            />
+          ) : (
+            <div className="flex items-center justify-center h-24 text-muted-foreground">
+              No expiring or expired orders
+            </div>
+          )}
+        </div>
+
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Orders Over Time Chart */}
+          <div className="admin-card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-foreground">Orders Over Time</h3>
+              <ToggleGroup type="single" value={ordersTimeframe} onValueChange={v => v && setOrdersTimeframe(v as 'day' | 'week' | 'month')}>
+                <ToggleGroupItem value="day">Day</ToggleGroupItem>
+                <ToggleGroupItem value="week">Week</ToggleGroupItem>
+                <ToggleGroupItem value="month">Month</ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+            {ordersOverTimeData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={ordersOverTimeData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" />
+                  <YAxis stroke="hsl(var(--muted-foreground))" allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Bar dataKey="count" fill="hsl(var(--primary))" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                No order data available
+              </div>
+            )}
+          </div>
           {/* Revenue Chart */}
           <div className="admin-card p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">Revenue Overview</h3>
