@@ -4,12 +4,14 @@ import { getFirestore } from 'firebase/firestore';
 // Firebase Configuration for Amine Jameli Services Admin Panel
 // Replace these placeholder values with your actual Firebase project credentials
 const firebaseConfig = {
-  apiKey: "your-api-key-here",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "your-sender-id",
-  appId: "your-app-id",
+  apiKey: "AIzaSyDGAsvk9LLFqmyVpdA2ro0hNHGaFQ2nUMw",
+  authDomain: "aminejameliservices.firebaseapp.com",
+  databaseURL: "https://aminejameliservices-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "aminejameliservices",
+  storageBucket: "aminejameliservices.appspot.com",
+  messagingSenderId: "815526979960",
+  appId: "1:815526979960:web:38e520885152f87a1b008d",
+  measurementId: "G-PX3L4MEJ7P"
 };
 
 // Initialize Firebase
