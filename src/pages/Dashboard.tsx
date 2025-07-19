@@ -1,6 +1,8 @@
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { StatsCard } from "@/components/StatsCard";
 import { DataTable } from "@/components/DataTable";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { 
   TrendingUp, 
   DollarSign, 
@@ -23,38 +25,10 @@ import {
   Pie,
   Cell
 } from 'recharts';
-
-// Mock data for demo
-const statsData = [
-  {
-    title: "Total Revenue",
-    value: "$24,567",
-    change: { value: "+12.5%", trend: "up" as const },
-    icon: DollarSign,
-    variant: "success" as const
-  },
-  {
-    title: "Total Orders",
-    value: "1,247",
-    change: { value: "+8.2%", trend: "up" as const },
-    icon: ShoppingCart,
-    variant: "default" as const
-  },
-  {
-    title: "Active Services",
-    value: "23",
-    change: { value: "+2", trend: "up" as const },
-    icon: Package,
-    variant: "default" as const
-  },
-  {
-    title: "Total Users",
-    value: "892",
-    change: { value: "+15.3%", trend: "up" as const },
-    icon: Users,
-    variant: "default" as const
-  }
-];
+import { getAllOrders } from "@/services/ordersService";
+import { getAllServices } from "@/services/servicesService";
+import { getAllUsers } from "@/services/usersService";
+import { formatCurrency } from "@/lib/utils";
 
 const revenueData = [
   { month: 'Jan', revenue: 4000, orders: 45 },
@@ -73,37 +47,14 @@ const serviceData = [
   { name: 'Others', value: 5, color: '#6B7280' },
 ];
 
-const recentOrders = [
-  {
-    id: '1',
-    client: 'John Doe',
-    service: 'Netflix Premium',
-    amount: '$15.99',
-    status: 'Active',
-    date: '2024-07-15'
-  },
-  {
-    id: '2',
-    client: 'Jane Smith',
-    service: 'ChatGPT Plus',
-    amount: '$20.00',
-    status: 'Active',
-    date: '2024-07-14'
-  },
-  {
-    id: '3',
-    client: 'Mike Johnson',
-    service: 'Canva Pro',
-    amount: '$12.99',
-    status: 'Expired',
-    date: '2024-07-13'
-  }
-];
-
 const orderColumns = [
-  { key: 'client', label: 'Client' },
-  { key: 'service', label: 'Service' },
-  { key: 'amount', label: 'Amount' },
+  { key: 'clientName', label: 'Client' },
+  { key: 'serviceName', label: 'Service' },
+  { 
+    key: 'price', 
+    label: 'Amount',
+    render: (price: number) => formatCurrency(price)
+  },
   { 
     key: 'status', 
     label: 'Status',
@@ -115,10 +66,86 @@ const orderColumns = [
       </span>
     )
   },
-  { key: 'date', label: 'Date' }
+  { key: 'startDate', label: 'Date' }
 ];
 
 export default function Dashboard() {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statsData, setStatsData] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        const [ordersData, servicesData, usersData] = await Promise.all([
+          getAllOrders(),
+          getAllServices(),
+          getAllUsers()
+        ]);
+        
+        setOrders(ordersData.slice(0, 5)); // Recent 5 orders
+        setServices(servicesData);
+        setUsers(usersData);
+        
+        // Calculate stats
+        const totalRevenue = ordersData.reduce((sum, order) => sum + (order.price || 0), 0);
+        const totalOrders = ordersData.length;
+        const activeServices = servicesData.filter(service => service.status === 'active').length;
+        const totalUsers = usersData.length;
+        
+        setStatsData([
+          {
+            title: "Total Revenue",
+            value: formatCurrency(totalRevenue),
+            change: { value: "+12.5%", trend: "up" as const },
+            icon: DollarSign,
+            variant: "success" as const
+          },
+          {
+            title: "Total Orders",
+            value: totalOrders.toString(),
+            change: { value: "+8.2%", trend: "up" as const },
+            icon: ShoppingCart,
+            variant: "default" as const
+          },
+          {
+            title: "Active Services",
+            value: activeServices.toString(),
+            change: { value: "+2", trend: "up" as const },
+            icon: Package,
+            variant: "default" as const
+          },
+          {
+            title: "Total Users",
+            value: totalUsers.toString(),
+            change: { value: "+15.3%", trend: "up" as const },
+            icon: Users,
+            variant: "default" as const
+          }
+        ]);
+        
+        setLoading(false);
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, []);
+
+  if (loading) {
+    return (
+      <Layout title="Dashboard" subtitle="Welcome back to Amine Jameli Services Admin Panel">
+        <div className="flex items-center justify-center h-64">
+          <LoadingSpinner text="Loading dashboard..." />
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout title="Dashboard" subtitle="Welcome back to Amine Jameli Services Admin Panel">
       <div className="space-y-6">
@@ -184,7 +211,7 @@ export default function Dashboard() {
         {/* Recent Orders */}
         <DataTable 
           title="Recent Orders"
-          data={recentOrders}
+          data={orders}
           columns={orderColumns}
           searchPlaceholder="Search orders..."
         />

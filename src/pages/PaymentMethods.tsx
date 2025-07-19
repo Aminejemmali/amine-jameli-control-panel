@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { DataTable } from "@/components/DataTable";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -8,8 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { CreditCard } from "lucide-react";
-import { useFirestoreCollection } from "@/hooks/useFirestore";
-import { COLLECTIONS } from "@/lib/firebaseConfig";
+import { 
+  subscribeToPaymentMethods, 
+  addPaymentMethod as addPaymentMethodToFirestore, 
+  updatePaymentMethod as updatePaymentMethodInFirestore, 
+  deletePaymentMethod as deletePaymentMethodFromFirestore 
+} from "@/services/paymentService";
 
 interface PaymentMethod {
   id: string;
@@ -19,43 +24,31 @@ interface PaymentMethod {
   exampleLast4: string;
 }
 
-// Mock data
-const mockPaymentMethods: PaymentMethod[] = [
-  {
-    id: '1',
-    type: 'Visa',
-    logo: 'https://cdn.worldvectorlogo.com/logos/visa-logo.svg',
-    description: 'Credit and debit cards',
-    exampleLast4: '1234'
-  },
-  {
-    id: '2',
-    type: 'PayPal',
-    logo: 'https://cdn.worldvectorlogo.com/logos/paypal-2.svg',
-    description: 'PayPal payments',
-    exampleLast4: '8762'
-  },
-  {
-    id: '3',
-    type: 'Bank Transfer',
-    logo: 'https://cdn.worldvectorlogo.com/logos/bank-2.svg',
-    description: 'Direct bank transfers',
-    exampleLast4: '5678'
-  },
-  {
-    id: '4',
-    type: 'Mastercard',
-    logo: 'https://cdn.worldvectorlogo.com/logos/mastercard-2.svg',
-    description: 'Mastercard payments',
-    exampleLast4: '9012'
-  }
-];
-
 export default function PaymentMethods() {
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(mockPaymentMethods);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethod | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const unsubscribe = subscribeToPaymentMethods((paymentMethodsData) => {
+      setPaymentMethods(paymentMethodsData);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  if (loading) {
+    return (
+      <Layout title="Payment Methods" subtitle="Manage accepted payment methods">
+        <div className="flex items-center justify-center h-64">
+          <LoadingSpinner text="Loading payment methods..." />
+        </div>
+      </Layout>
+    );
+  }
 
   const columns = [
     {
@@ -101,38 +94,51 @@ export default function PaymentMethods() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (paymentMethod: PaymentMethod) => {
+  const handleDelete = async (paymentMethod: PaymentMethod) => {
     if (confirm(`Are you sure you want to delete ${paymentMethod.type}?`)) {
-      setPaymentMethods(paymentMethods.filter(pm => pm.id !== paymentMethod.id));
-      toast({
-        title: "Payment method deleted",
-        description: `${paymentMethod.type} has been removed.`,
-      });
+      try {
+        await deletePaymentMethodFromFirestore(paymentMethod.id);
+        toast({
+          title: "Payment method deleted",
+          description: `${paymentMethod.type} has been removed.`,
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete payment method.",
+          variant: "destructive"
+        });
+      }
     }
   };
 
-  const handleSave = (formData: FormData) => {
+  const handleSave = async (formData: FormData) => {
     const paymentMethodData = {
-      id: editingPaymentMethod?.id || Date.now().toString(),
       type: formData.get('type') as string,
       logo: formData.get('logo') as string,
       description: formData.get('description') as string,
       exampleLast4: formData.get('exampleLast4') as string
     };
 
-    if (editingPaymentMethod) {
-      setPaymentMethods(paymentMethods.map(pm => 
-        pm.id === editingPaymentMethod.id ? paymentMethodData : pm
-      ));
+    try {
+      if (editingPaymentMethod) {
+        await updatePaymentMethodInFirestore(editingPaymentMethod.id, paymentMethodData);
+        toast({
+          title: "Payment method updated",
+          description: `${paymentMethodData.type} has been updated.`,
+        });
+      } else {
+        await addPaymentMethodToFirestore(paymentMethodData);
+        toast({
+          title: "Payment method created",
+          description: `${paymentMethodData.type} has been added.`,
+        });
+      }
+    } catch (error) {
       toast({
-        title: "Payment method updated",
-        description: `${paymentMethodData.type} has been updated.`,
-      });
-    } else {
-      setPaymentMethods([...paymentMethods, paymentMethodData]);
-      toast({
-        title: "Payment method created",
-        description: `${paymentMethodData.type} has been added.`,
+        title: "Error",
+        description: "Failed to save payment method.",
+        variant: "destructive"
       });
     }
 

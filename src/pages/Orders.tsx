@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { DataTable } from "@/components/DataTable";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -9,9 +10,16 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, DollarSign } from "lucide-react";
-import { useFirestoreCollection } from "@/hooks/useFirestore";
-import { COLLECTIONS } from "@/lib/firebaseConfig";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { 
+  subscribeToOrders, 
+  addOrder as addOrderToFirestore, 
+  updateOrder as updateOrderInFirestore, 
+  deleteOrder as deleteOrderFromFirestore 
+} from "@/services/ordersService";
+import { getAllServices } from "@/services/servicesService";
+import { getAllUsers } from "@/services/usersService";
+import { getAllPaymentMethods } from "@/services/paymentService";
 
 interface Order {
   id: string;
@@ -30,22 +38,53 @@ interface Order {
 
 
 export default function Orders() {
-  const { data: orders, loading: ordersLoading, addDocument: addOrder, updateDocument: updateOrder, deleteDocument: deleteOrder } = useFirestoreCollection(COLLECTIONS.ORDERS);
-  const { data: services, loading: servicesLoading } = useFirestoreCollection(COLLECTIONS.SERVICES);
-  const { data: users, loading: usersLoading } = useFirestoreCollection(COLLECTIONS.USERS);
-  const { data: paymentMethods, loading: paymentMethodsLoading } = useFirestoreCollection(COLLECTIONS.PAYMENT_METHODS);
-  
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<any>(null);
   const { toast } = useToast();
 
-  // Loading state
-  if (ordersLoading || servicesLoading || usersLoading || paymentMethodsLoading) {
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        const [servicesData, usersData, paymentMethodsData] = await Promise.all([
+          getAllServices(),
+          getAllUsers(),
+          getAllPaymentMethods()
+        ]);
+        
+        setServices(servicesData);
+        setUsers(usersData);
+        setPaymentMethods(paymentMethodsData);
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load initial data.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    loadInitialData();
+
+    const unsubscribe = subscribeToOrders((ordersData) => {
+      setOrders(ordersData);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  if (loading) {
     return (
       <Layout title="Orders" subtitle="Manage service orders">
         <div className="flex items-center justify-center h-64">
-          <div className="text-muted-foreground">Loading...</div>
+          <LoadingSpinner text="Loading orders..." />
         </div>
       </Layout>
     );
@@ -138,7 +177,7 @@ export default function Orders() {
   const handleDelete = async (order: Order) => {
     if (confirm(`Are you sure you want to delete this order?`)) {
       try {
-        await deleteOrder(order.id);
+        await deleteOrderFromFirestore(order.id);
         toast({
           title: "Order deleted",
           description: "The order has been removed.",
@@ -154,33 +193,26 @@ export default function Orders() {
   };
 
   const handleSave = async (formData: FormData) => {
-    const client = users.find(u => u.id === formData.get('clientId'));
-    const service = services.find(s => s.id === formData.get('serviceId'));
-    const paymentMethod = paymentMethods.find(pm => pm.id === formData.get('paymentMethodId'));
-
     const orderData = {
       clientId: formData.get('clientId') as string,
-      clientName: client?.clientName || '',
       serviceId: formData.get('serviceId') as string,
-      serviceName: service?.name || '',
       startDate: formData.get('startDate') as string,
-      endDate: service?.hasExpiration ? formData.get('endDate') as string : undefined,
+      endDate: selectedService?.hasExpiration ? formData.get('endDate') as string : undefined,
       price: parseFloat(formData.get('price') as string),
       cost: parseFloat(formData.get('cost') as string),
       paymentMethodId: formData.get('paymentMethodId') as string,
-      paymentMethod: paymentMethod?.type || '',
       status: 'active' as const
     };
 
     try {
       if (editingOrder) {
-        await updateOrder(editingOrder.id, orderData);
+        await updateOrderInFirestore(editingOrder.id, orderData);
         toast({
           title: "Order updated",
           description: "The order has been updated.",
         });
       } else {
-        await addOrder(orderData);
+        await addOrderToFirestore(orderData);
         toast({
           title: "Order created",
           description: "A new order has been created.",

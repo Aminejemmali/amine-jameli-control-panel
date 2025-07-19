@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { DataTable } from "@/components/DataTable";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -10,8 +11,12 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestoreCollection } from "@/hooks/useFirestore";
-import { COLLECTIONS } from "@/lib/firebaseConfig";
+import { 
+  subscribeToServices, 
+  addService as addServiceToFirestore, 
+  updateService as updateServiceInFirestore, 
+  deleteService as deleteServiceFromFirestore 
+} from "@/services/servicesService";
 
 interface Service {
   id: string;
@@ -23,16 +28,26 @@ interface Service {
 
 
 export default function Services() {
-  const { data: services, loading, addDocument: addService, updateDocument: updateService, deleteDocument: deleteService } = useFirestoreCollection(COLLECTIONS.SERVICES);
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const unsubscribe = subscribeToServices((servicesData) => {
+      setServices(servicesData);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   if (loading) {
     return (
       <Layout title="Services" subtitle="Manage digital services">
         <div className="flex items-center justify-center h-64">
-          <div className="text-muted-foreground">Loading...</div>
+          <LoadingSpinner text="Loading services..." />
         </div>
       </Layout>
     );
@@ -85,7 +100,7 @@ export default function Services() {
   const handleDelete = async (service: Service) => {
     if (confirm(`Are you sure you want to delete ${service.name}?`)) {
       try {
-        await deleteService(service.id);
+        await deleteServiceFromFirestore(service.id);
         toast({
           title: "Service deleted",
           description: `${service.name} has been removed.`,
@@ -110,13 +125,13 @@ export default function Services() {
 
     try {
       if (editingService) {
-        await updateService(editingService.id, serviceData);
+        await updateServiceInFirestore(editingService.id, serviceData);
         toast({
           title: "Service updated",
           description: `${serviceData.name} has been updated.`,
         });
       } else {
-        await addService(serviceData);
+        await addServiceToFirestore(serviceData);
         toast({
           title: "Service created",
           description: `${serviceData.name} has been added.`,
