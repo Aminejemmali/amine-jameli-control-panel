@@ -247,16 +247,19 @@ export default function Orders() {
   };
 
   const handleSave = async (formData: FormData) => {
-    const orderData = {
+    const orderData: any = {
       clientId: formData.get('clientId') as string,
       serviceId: formData.get('serviceId') as string,
       startDate: formData.get('startDate') as string,
-      endDate: selectedService?.hasExpiration ? formData.get('endDate') as string : undefined,
       price: parseFloat(formData.get('price') as string),
       cost: parseFloat(formData.get('cost') as string),
       paymentMethodId: formData.get('paymentMethodId') as string,
       status: 'active' as const
     };
+    if (selectedService?.hasExpiration) {
+      const endDate = formData.get('endDate') as string;
+      if (endDate) orderData.endDate = endDate;
+    }
 
     try {
       if (editingOrder) {
